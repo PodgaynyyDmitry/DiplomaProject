@@ -34,10 +34,10 @@ namespace ServerApp.Controllers
                 string filePath = null;
                 string fileName = null;
 
-                if (!string.IsNullOrEmpty(contentItem.FileData) && IsValidBase64(contentItem.FileData.Split(',')[1]))
+                if (!string.IsNullOrEmpty(contentItem.FileData) && IsValidBase64(contentItem.FileData))
                 {
-                    var fileData = Convert.FromBase64String(contentItem.FileData.Split(',')[1]);
-                    fileName = $"content_{informationUnitId}_{Guid.NewGuid()}";
+                    var (fileData, extension) = ExtractFileDataAndExtension(contentItem.FileData);
+                    fileName = $"content_{informationUnitId}_{Guid.NewGuid()}.{extension}";
                     filePath = Path.Combine("Uploads", fileName); // Обновление пути для сохранения файлов
                     Directory.CreateDirectory(Path.GetDirectoryName(filePath)); // Создание папки, если она не существует
                     await System.IO.File.WriteAllBytesAsync(filePath, fileData);
@@ -58,10 +58,10 @@ namespace ServerApp.Controllers
                 string filePath = null;
                 string fileName = null;
 
-                if (!string.IsNullOrEmpty(file.FileData) && IsValidBase64(file.FileData.Split(',')[1]))
+                if (!string.IsNullOrEmpty(file.FileData) && IsValidBase64(file.FileData))
                 {
-                    var fileData = Convert.FromBase64String(file.FileData.Split(',')[1]);
-                    fileName = $"file_{informationUnitId}_{Guid.NewGuid()}";
+                    var (fileData, extension) = ExtractFileDataAndExtension(file.FileData);
+                    fileName = $"file_{informationUnitId}_{Guid.NewGuid()}.{extension}";
                     filePath = Path.Combine("Uploads", fileName); // Обновление пути для сохранения файлов
                     Directory.CreateDirectory(Path.GetDirectoryName(filePath)); // Создание папки, если она не существует
                     await System.IO.File.WriteAllBytesAsync(filePath, fileData);
@@ -78,10 +78,26 @@ namespace ServerApp.Controllers
             return CreatedAtAction(nameof(Create), new { id = informationUnitId }, informationUnitDto);
         }
 
-        private bool IsValidBase64(string base64)
+        private bool IsValidBase64(string base64String)
         {
-            Span<byte> buffer = new Span<byte>(new byte[base64.Length]);
-            return Convert.TryFromBase64String(base64, buffer, out _);
+            if (string.IsNullOrEmpty(base64String))
+                return false;
+
+            base64String = base64String.Split(',')[1]; // Удаление префикса "data:image/png;base64,"
+            Span<byte> buffer = new Span<byte>(new byte[base64String.Length]);
+            return Convert.TryFromBase64String(base64String, buffer, out _);
+        }
+
+        private (byte[] fileData, string extension) ExtractFileDataAndExtension(string base64String)
+        {
+            var parts = base64String.Split(',');
+            var metaData = parts[0]; // Пример: "data:image/png;base64,"
+            var base64Data = parts[1];
+
+            var data = Convert.FromBase64String(base64Data);
+            var extension = metaData.Split(';')[0].Split('/')[1]; // Пример: "png"
+
+            return (data, extension);
         }
     }
 
