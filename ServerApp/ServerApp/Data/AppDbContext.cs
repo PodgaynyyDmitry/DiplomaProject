@@ -4,6 +4,7 @@ using Npgsql;
 using ServerApp.Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using ServerApp.Controllers;
 namespace ServerApp.Data
 {
 
@@ -69,6 +70,104 @@ namespace ServerApp.Data
             await this.Database.ExecuteSqlRawAsync(
                 "SELECT create_file(@InformationUnitId, @Path, @SequenceNumber, @FileName)",
                 informationUnitIdParam, pathParam, sequenceNumberParam, fileNameParam);
+        }
+        public async Task<InformationUnitDto> GetInformationUnitAsync(int id)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT * FROM get_information_unit(@id)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@id", NpgsqlTypes.NpgsqlDbType.Integer) { Value = id });
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            return new InformationUnitDto
+                            {
+                                Title = reader.GetString(0),
+                                AccessModifier = reader.GetBoolean(1),
+                                ChapterId = reader.GetInt32(2),
+                                CreationDate = reader.GetDateTime(3)
+                            };
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+            return null;
+        }
+
+        public async Task<List<ContentItemDto>> GetContentItemsAsync(int informationUnitId)
+        {
+            var contentItems = new List<ContentItemDto>();
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT * FROM get_content_items(@informationUnitId)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@informationUnitId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = informationUnitId });
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            contentItems.Add(new ContentItemDto
+                            {
+                                ContentType = reader.GetString(0),
+                                Content = reader.IsDBNull(1) ? null : reader.GetString(1),
+                                Description = reader.GetString(2),
+                                FilePath = reader.IsDBNull(3) ? null : reader.GetString(3)
+                            });
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+            return contentItems;
+        }
+
+        public async Task<List<FileDto>> GetFilesAsync(int informationUnitId)
+        {
+            var files = new List<FileDto>();
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT * FROM get_files(@informationUnitId)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@informationUnitId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = informationUnitId });
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            files.Add(new FileDto
+                            {
+                                Path = reader.GetString(0),
+                                FileName = reader.GetString(1)
+                            });
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+            return files;
+        }
+
+        public async Task DeleteInformationUnitAsync(int id)
+        {
+            var idParam = new NpgsqlParameter("@id", NpgsqlTypes.NpgsqlDbType.Integer) { Value = id };
+            await this.Database.ExecuteSqlRawAsync("SELECT delete_information_unit(@id)", idParam);
         }
     }
 }

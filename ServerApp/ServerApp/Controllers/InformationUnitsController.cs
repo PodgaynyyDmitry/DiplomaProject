@@ -4,6 +4,8 @@ using ServerApp.Data;
 using ServerApp.Models;
 using ServerApp.Data;
 using Newtonsoft.Json;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace ServerApp.Controllers
 {
@@ -77,6 +79,40 @@ namespace ServerApp.Controllers
 
             return CreatedAtAction(nameof(Create), new { id = informationUnitId }, informationUnitDto);
         }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<InformationUnitDto>> Get(int id)
+        {
+            var informationUnit = await _context.GetInformationUnitAsync(id);
+            if (informationUnit == null)
+            {
+                return NotFound();
+            }
+
+            var contentItems = await _context.GetContentItemsAsync(id);
+            var files = await _context.GetFilesAsync(id);
+
+            informationUnit.ContentItems = contentItems;
+            informationUnit.Files = files;
+
+            return Ok(informationUnit);
+        }
+
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            //var informationUnit = await _context.InformationUnits.FindAsync(id);
+            //if (informationUnit == null)
+            //{
+            //    return NotFound();
+            //}
+
+            await _context.DeleteInformationUnitAsync(id);
+            return NoContent();
+        }
+
+
 
         private bool IsValidBase64(string base64String)
         {
