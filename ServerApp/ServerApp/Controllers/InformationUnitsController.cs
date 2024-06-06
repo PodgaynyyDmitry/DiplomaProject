@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using ServerApp.Data;
 using ServerApp.Models;
 using ServerApp.Data;
+using Newtonsoft.Json;
 
 namespace ServerApp.Controllers
 {
@@ -20,37 +21,67 @@ namespace ServerApp.Controllers
         [HttpPost]
         public async Task<ActionResult> Create([FromBody] InformationUnitDto informationUnitDto)
         {
-            // Создаем информационную единицу
             int informationUnitId = await _context.CreateInformationUnitAsync(
                 informationUnitDto.Title,
                 informationUnitDto.AccessModifier,
                 informationUnitDto.ChapterId,
                 informationUnitDto.CreationDate);
 
-            // Создаем контент-элементы
-            // Создаем контент-элементы
-            for (int i = 0; i < informationUnitDto.ContentItems.Count; i++)
+            var baseUrl = $"{Request.Scheme}://{Request.Host}/uploads/";
+
+            foreach (var contentItem in informationUnitDto.ContentItems)
             {
-                var contentItem = informationUnitDto.ContentItems[i];
+                string filePath = null;
+                string fileName = null;
+
+                if (!string.IsNullOrEmpty(contentItem.FileData) && IsValidBase64(contentItem.FileData.Split(',')[1]))
+                {
+                    var fileData = Convert.FromBase64String(contentItem.FileData.Split(',')[1]);
+                    fileName = $"content_{informationUnitId}_{Guid.NewGuid()}";
+                    filePath = Path.Combine("Uploads", fileName); // Обновление пути для сохранения файлов
+                    Directory.CreateDirectory(Path.GetDirectoryName(filePath)); // Создание папки, если она не существует
+                    await System.IO.File.WriteAllBytesAsync(filePath, fileData);
+                    filePath = Path.Combine(baseUrl, fileName);
+                }
+
                 await _context.CreateContentItemAsync(
                     informationUnitId,
-                    i + 1,
+                    informationUnitDto.ContentItems.IndexOf(contentItem) + 1,
                     contentItem.ContentType,
                     contentItem.Content,
-                    contentItem.FilePath);
+                    filePath,
+                    contentItem.Description);
             }
 
-            // Создаем файлы
-            for (int i = 0; i < informationUnitDto.Files.Count; i++)
+            foreach (var file in informationUnitDto.Files)
             {
-                var file = informationUnitDto.Files[i];
+                string filePath = null;
+                string fileName = null;
+
+                if (!string.IsNullOrEmpty(file.FileData) && IsValidBase64(file.FileData.Split(',')[1]))
+                {
+                    var fileData = Convert.FromBase64String(file.FileData.Split(',')[1]);
+                    fileName = $"file_{informationUnitId}_{Guid.NewGuid()}";
+                    filePath = Path.Combine("Uploads", fileName); // Обновление пути для сохранения файлов
+                    Directory.CreateDirectory(Path.GetDirectoryName(filePath)); // Создание папки, если она не существует
+                    await System.IO.File.WriteAllBytesAsync(filePath, fileData);
+                    filePath = Path.Combine(baseUrl, fileName);
+                }
+
                 await _context.CreateFileAsync(
                     informationUnitId,
-                    file.Path,
-                    i + 1);
+                    filePath,
+                    informationUnitDto.Files.IndexOf(file) + 1,
+                    fileName);
             }
 
             return CreatedAtAction(nameof(Create), new { id = informationUnitId }, informationUnitDto);
+        }
+
+        private bool IsValidBase64(string base64)
+        {
+            Span<byte> buffer = new Span<byte>(new byte[base64.Length]);
+            return Convert.TryFromBase64String(base64, buffer, out _);
         }
     }
 
@@ -69,10 +100,14 @@ namespace ServerApp.Controllers
         public string ContentType { get; set; }
         public string Content { get; set; }
         public string FilePath { get; set; }
+        public string Description { get; set; }
+        public string FileData { get; set; }
     }
 
     public class FileDto
     {
         public string Path { get; set; }
+        public string FileName { get; set; }
+        public string FileData { get; set; }
     }
 }
