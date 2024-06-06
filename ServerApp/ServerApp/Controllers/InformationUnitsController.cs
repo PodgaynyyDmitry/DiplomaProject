@@ -102,17 +102,84 @@ namespace ServerApp.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            //var informationUnit = await _context.InformationUnits.FindAsync(id);
-            //if (informationUnit == null)
-            //{
-            //    return NotFound();
-            //}
-
+            var exists = await _context.Database.ExecuteSqlRawAsync("SELECT 1 FROM \"InformationUnit\" WHERE \"PK_InformationUnit\" = {0}", id);
+            if (exists == 0)
+            {
+                return NotFound();
+            }
             await _context.DeleteInformationUnitAsync(id);
             return NoContent();
         }
 
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, [FromBody] InformationUnitDto informationUnitDto)
+        {
+            // Удаляем существующую информационную единицу
+            var exists = await _context.Database.ExecuteSqlRawAsync("SELECT 1 FROM \"InformationUnit\" WHERE \"PK_InformationUnit\" = {0}", id);
+            if (exists == 0)
+            {
+                return NotFound();
+            }
 
+            await _context.DeleteInformationUnitAsync(id);
+
+            // Создаем новую информационную единицу с новыми данными
+            int newInformationUnitId = await _context.CreateInformationUnitAsync(
+                informationUnitDto.Title,
+                informationUnitDto.AccessModifier,
+                informationUnitDto.ChapterId,
+                informationUnitDto.CreationDate);
+
+            var baseUrl = $"{Request.Scheme}://{Request.Host}/uploads/";
+
+            foreach (var contentItem in informationUnitDto.ContentItems)
+            {
+                string filePath = null;
+                string fileName = null;
+
+                if (!string.IsNullOrEmpty(contentItem.FileData) && IsValidBase64(contentItem.FileData))
+                {
+                    var (fileData, extension) = ExtractFileDataAndExtension(contentItem.FileData);
+                    fileName = $"content_{newInformationUnitId}_{Guid.NewGuid()}.{extension}";
+                    filePath = Path.Combine("Uploads", fileName);
+                    Directory.CreateDirectory(Path.GetDirectoryName(filePath));
+                    await System.IO.File.WriteAllBytesAsync(filePath, fileData);
+                    filePath = Path.Combine(baseUrl, fileName);
+                }
+
+                await _context.CreateContentItemAsync(
+                    newInformationUnitId,
+                    informationUnitDto.ContentItems.IndexOf(contentItem) + 1,
+                    contentItem.ContentType,
+                    contentItem.Content,
+                    filePath,
+                    contentItem.Description);
+            }
+
+            foreach (var file in informationUnitDto.Files)
+            {
+                string filePath = null;
+                string fileName = null;
+
+                if (!string.IsNullOrEmpty(file.FileData) && IsValidBase64(file.FileData))
+                {
+                    var (fileData, extension) = ExtractFileDataAndExtension(file.FileData);
+                    fileName = $"file_{newInformationUnitId}_{Guid.NewGuid()}.{extension}";
+                    filePath = Path.Combine("Uploads", fileName);
+                    Directory.CreateDirectory(Path.GetDirectoryName(filePath));
+                    await System.IO.File.WriteAllBytesAsync(filePath, fileData);
+                    filePath = Path.Combine(baseUrl, fileName);
+                }
+
+                await _context.CreateFileAsync(
+                    newInformationUnitId,
+                    filePath,
+                    informationUnitDto.Files.IndexOf(file) + 1,
+                    fileName);
+            }
+
+            return Ok(new { id = newInformationUnitId });
+        }
 
         private bool IsValidBase64(string base64String)
         {
