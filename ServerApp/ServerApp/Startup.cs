@@ -22,10 +22,11 @@ namespace ServerApp
         {
             services.AddControllers();
 
+            // Настройка подключения к базе данных PostgreSQL
             services.AddDbContext<AppDbContext>(options =>
                 options.UseNpgsql(Configuration.GetConnectionString("DefaultConnection")));
 
-            // Добавляем Swagger
+            // Добавление Swagger для документирования API
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "InformationUnitsApi", Version = "v1" });

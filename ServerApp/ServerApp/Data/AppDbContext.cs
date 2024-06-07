@@ -5,6 +5,7 @@ using ServerApp.Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using ServerApp.Controllers;
+using System.Security.Claims;
 namespace ServerApp.Data
 {
 
@@ -15,6 +16,10 @@ namespace ServerApp.Data
         public DbSet<InformationUnit> InformationUnits { get; set; }
         public DbSet<ContentItem> ContentItems { get; set; }
         public DbSet<Models.File> Files { get; set; }
+        public DbSet<Discipline> Disciplines { get; set; }
+        public DbSet<Class> Classes { get; set; }
+        public DbSet<ClassContent> ClassContents { get; set; }
+        public DbSet<ClassFile> ClassFiles { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -224,6 +229,102 @@ namespace ServerApp.Data
                 }
             }
             return null;
+        }
+
+        public async Task<int> CreateDisciplineAsync(string module, string chapter, string disciplineNumber, string title, int departmentId)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT create_discipline(@Module, @Chapter, @DisciplineNumber, @Title, @DepartmentId)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@Module", NpgsqlTypes.NpgsqlDbType.Text) { Value = module });
+                    cmd.Parameters.Add(new NpgsqlParameter("@Chapter", NpgsqlTypes.NpgsqlDbType.Text) { Value = chapter });
+                    cmd.Parameters.Add(new NpgsqlParameter("@DisciplineNumber", NpgsqlTypes.NpgsqlDbType.Text) { Value = disciplineNumber });
+                    cmd.Parameters.Add(new NpgsqlParameter("@Title", NpgsqlTypes.NpgsqlDbType.Text) { Value = title });
+                    cmd.Parameters.Add(new NpgsqlParameter("@DepartmentId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = departmentId });
+
+                    var result = await cmd.ExecuteScalarAsync();
+                    return (int)result;
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
+
+        public async Task<int> CreateClassAsync(int disciplineId, DateTime startDate, int duration, string topic, int classTypeId, int teacherId, int userId, int classRoomId, int platoonsId)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT create_class(@DisciplineId, @StartDate, @Duration, @Topic, @ClassTypeId, @TeacherId, @UserId, @ClassRoomId, @PlatoonsId)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@DisciplineId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = disciplineId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@StartDate", NpgsqlTypes.NpgsqlDbType.Timestamp) { Value = startDate });
+                    cmd.Parameters.Add(new NpgsqlParameter("@Duration", NpgsqlTypes.NpgsqlDbType.Integer) { Value = duration });
+                    cmd.Parameters.Add(new NpgsqlParameter("@Topic", NpgsqlTypes.NpgsqlDbType.Text) { Value = topic });
+                    cmd.Parameters.Add(new NpgsqlParameter("@ClassTypeId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = classTypeId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@TeacherId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = teacherId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@UserId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = userId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@ClassRoomId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = classRoomId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@PlatoonsId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = platoonsId });
+
+                    var result = await cmd.ExecuteScalarAsync();
+                    return (int)result;
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
+
+        public async Task CreateClassContentAsync(int classId, int sequenceNumber, string contentType, string content, string filePath)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT create_class_content(@ClassId, @SequenceNumber, @ContentType, @Content, @FilePath)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@ClassId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = classId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@SequenceNumber", NpgsqlTypes.NpgsqlDbType.Integer) { Value = sequenceNumber });
+                    cmd.Parameters.Add(new NpgsqlParameter("@ContentType", NpgsqlTypes.NpgsqlDbType.Varchar) { Value = contentType });
+                    cmd.Parameters.Add(new NpgsqlParameter("@Content", NpgsqlTypes.NpgsqlDbType.Text) { Value = (object)content ?? DBNull.Value });
+                    cmd.Parameters.Add(new NpgsqlParameter("@FilePath", NpgsqlTypes.NpgsqlDbType.Text) { Value = (object)filePath ?? DBNull.Value });
+
+                    await cmd.ExecuteScalarAsync();
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
+
+        public async Task CreateClassFileAsync(int classId, int sequenceNumber, string filePath)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT create_class_file(@ClassId, @SequenceNumber, @FilePath)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@ClassId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = classId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@SequenceNumber", NpgsqlTypes.NpgsqlDbType.Integer) { Value = sequenceNumber });
+                    cmd.Parameters.Add(new NpgsqlParameter("@FilePath", NpgsqlTypes.NpgsqlDbType.Text) { Value = (object)filePath ?? DBNull.Value });
+
+                    await cmd.ExecuteScalarAsync();
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
         }
     }
 }
