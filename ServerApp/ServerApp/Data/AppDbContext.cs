@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using ServerApp.Controllers;
 using System.Security.Claims;
+using ServerApp.Controllers.ServerApp.Controllers;
 namespace ServerApp.Data
 {
 
@@ -326,5 +327,104 @@ namespace ServerApp.Data
                 await conn.CloseAsync();
             }
         }
+
+        public async Task<ClassDto> GetClassAsync(int id)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT * FROM get_class(@id)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@id", NpgsqlTypes.NpgsqlDbType.Integer) { Value = id });
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            return new ClassDto
+                            {
+                                DisciplineId = reader.GetInt32(0),
+                                StartDate = reader.GetDateTime(1),
+                                Duration = reader.GetInt32(2),
+                                Topic = reader.GetString(3),
+                                ClassTypeId = reader.GetInt32(4),
+                                TeacherId = reader.GetInt32(5),
+                                UserId = reader.GetInt32(6),
+                                ClassRoomId = reader.GetInt32(7),
+                                PlatoonsId = reader.GetInt32(8)
+                            };
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+            return null;
+        }
+
+        public async Task<List<ClassContentDto>> GetClassContentAsync(int classId)
+        {
+            var classContents = new List<ClassContentDto>();
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT * FROM get_class_content(@classId)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@classId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = classId });
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            classContents.Add(new ClassContentDto
+                            {
+                                SequenceNumber = reader.GetInt32(0),
+                                ContentType = reader.GetString(1),
+                                Content = reader.IsDBNull(2) ? null : reader.GetString(2),
+                                FilePath = reader.IsDBNull(3) ? null : reader.GetString(3)
+                            });
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+            return classContents;
+        }
+
+        public async Task<List<ClassFileDto>> GetClassFilesAsync(int classId)
+        {
+            var classFiles = new List<ClassFileDto>();
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT * FROM get_class_files(@classId)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@classId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = classId });
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            classFiles.Add(new ClassFileDto
+                            {
+                                SequenceNumber = reader.GetInt32(0),
+                                FilePath = reader.GetString(1)
+                            });
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+            return classFiles;
+        }
     }
 }
+

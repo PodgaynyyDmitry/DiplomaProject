@@ -110,6 +110,24 @@ namespace ServerApp.Controllers
                 return CreatedAtAction(nameof(CreateClass), new { id = classId }, classDto);
             }
 
+            [HttpGet("class/{id}")]
+            public async Task<ActionResult<ClassDto>> GetClass(int id)
+            {
+                var classInfo = await _context.GetClassAsync(id);
+                if (classInfo == null)
+                {
+                    return NotFound();
+                }
+
+                var classContent = await _context.GetClassContentAsync(id);
+                var classFiles = await _context.GetClassFilesAsync(id);
+
+                classInfo.ClassContents = classContent;
+                classInfo.ClassFiles = classFiles;
+
+                return Ok(classInfo);
+            }
+
             private bool IsValidBase64(string base64String)
             {
                 if (string.IsNullOrEmpty(base64String))
@@ -153,22 +171,24 @@ namespace ServerApp.Controllers
             public int UserId { get; set; }
             public int ClassRoomId { get; set; }
             public int PlatoonsId { get; set; }
-            public List<ClassContentDto> ClassContents { get; set; }
-            public List<ClassFileDto> ClassFiles { get; set; }
+            public List<ClassContentDto> ClassContents { get; set; } = new List<ClassContentDto>();
+            public List<ClassFileDto> ClassFiles { get; set; } = new List<ClassFileDto>();
         }
 
         public class ClassContentDto
         {
+            public int SequenceNumber { get; set; }
             public string ContentType { get; set; }
             public string Content { get; set; }
             public string FilePath { get; set; }
-            public string FileData { get; set; }
+            public string FileData { get; set; } // Добавляем это свойство
         }
 
         public class ClassFileDto
         {
+            public int SequenceNumber { get; set; }
             public string FilePath { get; set; }
-            public string FileData { get; set; }
+            public string FileData { get; set; } // Добавляем это свойство
         }
     }
 }
