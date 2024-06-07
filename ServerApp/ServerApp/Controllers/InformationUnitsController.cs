@@ -181,6 +181,14 @@ namespace ServerApp.Controllers
             return Ok(new { id = newInformationUnitId });
         }
 
+
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<InformationUnitSummaryDto>>> GetAll()
+        {
+            var informationUnits = await _context.GetAllInformationUnitsAsync();
+            return Ok(informationUnits);
+        }
+
         private bool IsValidBase64(string base64String)
         {
             if (string.IsNullOrEmpty(base64String))
@@ -228,5 +236,13 @@ namespace ServerApp.Controllers
         public string Path { get; set; }
         public string FileName { get; set; }
         public string FileData { get; set; }
+    }
+
+    public class InformationUnitSummaryDto
+    {
+        public int Id { get; set; }
+        public string Title { get; set; }
+        public DateTime CreationDate { get; set; }
+        public ContentItemDto FirstContentItem { get; set; }
     }
 }

@@ -169,5 +169,61 @@ namespace ServerApp.Data
             var idParam = new NpgsqlParameter("@id", NpgsqlTypes.NpgsqlDbType.Integer) { Value = id };
             await this.Database.ExecuteSqlRawAsync("SELECT delete_information_unit(@id)", idParam);
         }
+        public async Task<List<InformationUnitSummaryDto>> GetAllInformationUnitsAsync()
+        {
+            var informationUnits = new List<InformationUnitSummaryDto>();
+
+            using (var command = this.Database.GetDbConnection().CreateCommand())
+            {
+                command.CommandText = "SELECT \"PK_InformationUnit\", \"Title\", \"CreationDate\" FROM \"InformationUnit\" ORDER BY \"PK_InformationUnit\" DESC";
+                this.Database.OpenConnection();
+                using (var result = await command.ExecuteReaderAsync())
+                {
+                    while (await result.ReadAsync())
+                    {
+                        var unit = new InformationUnitSummaryDto
+                        {
+                            Id = result.GetInt32(0),
+                            Title = result.GetString(1),
+                            CreationDate = result.GetDateTime(2)
+                        };
+                        informationUnits.Add(unit);
+                    }
+                }
+            }
+
+            foreach (var unit in informationUnits)
+            {
+                var contentItem = await GetFirstContentItemAsync(unit.Id);
+                unit.FirstContentItem = contentItem;
+            }
+
+            return informationUnits;
+        }
+
+        private async Task<ContentItemDto> GetFirstContentItemAsync(int informationUnitId)
+        {
+            using (var command = this.Database.GetDbConnection().CreateCommand())
+            {
+                command.CommandText = "SELECT \"ContentType\", \"Content\", \"FilePath\", \"Description\" FROM \"ContentItem\" WHERE \"PK_InformationUnit\" = @informationUnitId ORDER BY \"SequenceNumber\" LIMIT 1";
+                command.Parameters.Add(new NpgsqlParameter("@informationUnitId", informationUnitId));
+                this.Database.OpenConnection();
+
+                using (var result = await command.ExecuteReaderAsync())
+                {
+                    if (await result.ReadAsync())
+                    {
+                        return new ContentItemDto
+                        {
+                            ContentType = result.GetString(0),
+                            Content = result.IsDBNull(1) ? null : result.GetString(1),
+                            FilePath = result.IsDBNull(2) ? null : result.GetString(2),
+                            Description = result.IsDBNull(3) ? null : result.GetString(3)
+                        };
+                    }
+                }
+            }
+            return null;
+        }
     }
 }
