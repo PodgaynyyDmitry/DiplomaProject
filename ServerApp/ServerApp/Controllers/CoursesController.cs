@@ -128,6 +128,19 @@ namespace ServerApp.Controllers
                 return Ok(classInfo);
             }
 
+            [HttpDelete("class/{id}")]
+            public async Task<IActionResult> DeleteClass(int id)
+            {
+                var exists = await _context.Database.ExecuteSqlRawAsync("SELECT 1 FROM \"Class\" WHERE \"PK_Class\" = {0}", id);
+                if (exists == 0)
+                {
+                    return NotFound();
+                }
+
+                await _context.DeleteClassAsync(id);
+                return NoContent();
+            }
+
             private bool IsValidBase64(string base64String)
             {
                 if (string.IsNullOrEmpty(base64String))

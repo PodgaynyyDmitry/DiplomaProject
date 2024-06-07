@@ -425,6 +425,24 @@ namespace ServerApp.Data
             }
             return classFiles;
         }
+
+        public async Task DeleteClassAsync(int classId)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT delete_class(@classId)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@classId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = classId });
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
     }
 }
 
