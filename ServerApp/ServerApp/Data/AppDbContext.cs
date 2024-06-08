@@ -443,6 +443,179 @@ namespace ServerApp.Data
                 await conn.CloseAsync();
             }
         }
+
+        public async Task<int> UpdateClassAsync(int classId, ClassDto classDto)
+        {
+            await DeleteClassAsync(classId);
+            int newClassId = await CreateClassAsync(
+                classDto.DisciplineId,
+                classDto.StartDate,
+                classDto.Duration,
+                classDto.Topic,
+                classDto.ClassTypeId,
+                classDto.TeacherId,
+                classDto.UserId,
+                classDto.ClassRoomId,
+                classDto.PlatoonsId
+            );
+
+            foreach (var contentItem in classDto.ClassContents)
+            {
+                await CreateClassContentAsync(
+                    newClassId,
+                    contentItem.SequenceNumber,
+                    contentItem.ContentType,
+                    contentItem.Content,
+                    contentItem.FilePath
+                );
+            }
+
+            foreach (var file in classDto.ClassFiles)
+            {
+                await CreateClassFileAsync(
+                    newClassId,
+                    file.SequenceNumber,
+                    file.FilePath
+                );
+            }
+
+            return newClassId;
+        }
+
+        public async Task<List<DisciplineSummaryDto>> GetAllDisciplinesAsync()
+        {
+            var disciplines = new List<DisciplineSummaryDto>();
+
+            using (var command = this.Database.GetDbConnection().CreateCommand())
+            {
+                command.CommandText = "SELECT \"PK_Discipline\", \"Title\" FROM \"Discipline\" ORDER BY \"PK_Discipline\" DESC";
+                this.Database.OpenConnection();
+                using (var result = await command.ExecuteReaderAsync())
+                {
+                    while (await result.ReadAsync())
+                    {
+                        var discipline = new DisciplineSummaryDto
+                        {
+                            Id = result.GetInt32(0),
+                            Title = result.GetString(1)
+                        };
+                        disciplines.Add(discipline);
+                    }
+                }
+            }
+
+            return disciplines;
+        }
+
+        public async Task<List<ClassSummaryDto>> GetAllClassesByDisciplineAsync(int disciplineId)
+        {
+            var classes = new List<ClassSummaryDto>();
+
+            using (var command = this.Database.GetDbConnection().CreateCommand())
+            {
+                command.CommandText = "SELECT \"PK_Class\", \"Topic\" FROM \"Class\" WHERE \"PK_Discipline\" = @DisciplineId ORDER BY \"PK_Class\" DESC";
+                command.Parameters.Add(new NpgsqlParameter("@DisciplineId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = disciplineId });
+                this.Database.OpenConnection();
+                using (var result = await command.ExecuteReaderAsync())
+                {
+                    while (await result.ReadAsync())
+                    {
+                        var classItem = new ClassSummaryDto
+                        {
+                            Id = result.GetInt32(0),
+                            Topic = result.GetString(1)
+                        };
+                        classes.Add(classItem);
+                    }
+                }
+            }
+
+            return classes;
+        }
+
+        public async Task<int> CreatePlatoonScheduleAsync(int platoonsId, DateTime weekStartDate, DateTime weekEndDate)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT create_platoon_schedule(@PlatoonsId, @WeekStartDate, @WeekEndDate)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@PlatoonsId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = platoonsId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@WeekStartDate", NpgsqlTypes.NpgsqlDbType.Date) { Value = weekStartDate });
+                    cmd.Parameters.Add(new NpgsqlParameter("@WeekEndDate", NpgsqlTypes.NpgsqlDbType.Date) { Value = weekEndDate });
+
+                    var result = await cmd.ExecuteScalarAsync();
+                    return (int)result;
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
+
+        public async Task<int> CreateAcademicHourAsync(int platoonScheduleId,int platoonsId, int sequenceNumber,int numberOfHours, string disciplineCode,string topic,int classTypeId)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT create_academic_hour(@PlatoonScheduleId, @PlatoonsId, @SequenceNumber, @NumberOfHours, @DisciplineCode, @Topic, @ClassTypeId)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@PlatoonScheduleId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = platoonScheduleId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@PlatoonsId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = platoonsId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@SequenceNumber", NpgsqlTypes.NpgsqlDbType.Integer) { Value = sequenceNumber });
+                    cmd.Parameters.Add(new NpgsqlParameter("@NumberOfHours", NpgsqlTypes.NpgsqlDbType.Integer) { Value = numberOfHours });
+                    cmd.Parameters.Add(new NpgsqlParameter("@DisciplineCode", NpgsqlTypes.NpgsqlDbType.Varchar) { Value = disciplineCode });
+                    cmd.Parameters.Add(new NpgsqlParameter("@Topic", NpgsqlTypes.NpgsqlDbType.Varchar) { Value = topic });
+                    cmd.Parameters.Add(new NpgsqlParameter("@ClassTypeId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = classTypeId });
+
+                    var result = await cmd.ExecuteScalarAsync();
+                    return (int)result;
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
+
+        public async Task<List<AcademicHourDto>> GetAcademicHoursAsync(int platoonScheduleId)
+        {
+            var academicHours = new List<AcademicHourDto>();
+
+            using (var command = this.Database.GetDbConnection().CreateCommand())
+            {
+                command.CommandText = @"SELECT ""PK_AcademicHour"", ""PK_PlatoonSchedule"", ""PK_Platoons"", 
+                                ""SequenceNumber"", ""NumberOfHours"", ""DisciplineCode"", ""Topic"", ""PK_ClassType"" 
+                                FROM ""AcademicHour"" 
+                                WHERE ""PK_PlatoonSchedule"" = @PlatoonScheduleId";
+
+                command.Parameters.Add(new NpgsqlParameter("@PlatoonScheduleId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = platoonScheduleId });
+
+                this.Database.OpenConnection();
+                using (var result = await command.ExecuteReaderAsync())
+                {
+                    while (await result.ReadAsync())
+                    {
+                        academicHours.Add(new AcademicHourDto
+                        {
+                            AcademicHourId = result.GetInt32(0),
+                            PlatoonScheduleId = result.GetInt32(1),
+                            PlatoonsId = result.GetInt32(2),
+                            SequenceNumber = result.GetInt32(3),
+                            NumberOfHours = result.GetInt32(4),
+                            DisciplineCode = result.IsDBNull(5) ? null : result.GetString(5),
+                            Topic = result.GetString(6),
+                            ClassTypeId = result.GetInt32(7)
+                        });
+                    }
+                }
+            }
+
+            return academicHours;
+        }
     }
 }
 

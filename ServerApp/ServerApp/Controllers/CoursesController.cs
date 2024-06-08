@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using ServerApp.Data;
 using ServerApp.Models;
 using System.Threading.Tasks;
@@ -131,8 +132,8 @@ namespace ServerApp.Controllers
             [HttpDelete("class/{id}")]
             public async Task<IActionResult> DeleteClass(int id)
             {
-                var exists = await _context.Database.ExecuteSqlRawAsync("SELECT 1 FROM \"Class\" WHERE \"PK_Class\" = {0}", id);
-                if (exists == 0)
+                var exists = await CheckIfClassExists(id);
+                if (!exists)
                 {
                     return NotFound();
                 }
@@ -141,6 +142,53 @@ namespace ServerApp.Controllers
                 return NoContent();
             }
 
+            [HttpPut("class/{id}")]
+            public async Task<IActionResult> UpdateClass(int id, [FromBody] ClassDto classDto)
+            {
+                var exists = await CheckIfClassExists(id);
+                if (!exists)
+                {
+                    return NotFound();
+                }
+
+                int newClassId = await _context.UpdateClassAsync(id, classDto);
+                return Ok(new { id = newClassId });
+            }
+
+            [HttpGet("disciplines")]
+            public async Task<ActionResult<IEnumerable<DisciplineSummaryDto>>> GetAllDisciplines()
+            {
+                var disciplines = await _context.GetAllDisciplinesAsync();
+                return Ok(disciplines);
+            }
+
+            [HttpGet("classes/{disciplineId}")]
+            public async Task<ActionResult<IEnumerable<ClassSummaryDto>>> GetAllClassesByDiscipline(int disciplineId)
+            {
+                var classes = await _context.GetAllClassesByDisciplineAsync(disciplineId);
+                return Ok(classes);
+            }
+
+
+
+            private async Task<bool> CheckIfClassExists(int classId)
+            {
+                var conn = (NpgsqlConnection)_context.Database.GetDbConnection();
+                await conn.OpenAsync();
+                try
+                {
+                    using (var cmd = new NpgsqlCommand("SELECT 1 FROM \"Class\" WHERE \"PK_Class\" = @ClassId", conn))
+                    {
+                        cmd.Parameters.Add(new NpgsqlParameter("@ClassId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = classId });
+                        var result = await cmd.ExecuteScalarAsync();
+                        return result != null && result != DBNull.Value;
+                    }
+                }
+                finally
+                {
+                    await conn.CloseAsync();
+                }
+            }
             private bool IsValidBase64(string base64String)
             {
                 if (string.IsNullOrEmpty(base64String))
@@ -150,7 +198,6 @@ namespace ServerApp.Controllers
                 Span<byte> buffer = new Span<byte>(new byte[base64String.Length]);
                 return Convert.TryFromBase64String(base64String, buffer, out _);
             }
-
             private (byte[] fileData, string extension) ExtractFileDataAndExtension(string base64String)
             {
                 var parts = base64String.Split(',');
@@ -203,5 +250,16 @@ namespace ServerApp.Controllers
             public string FilePath { get; set; }
             public string FileData { get; set; } // Добавляем это свойство
         }
+        public class DisciplineSummaryDto
+        {
+            public int Id { get; set; }
+            public string Title { get; set; }
+        }
+        public class ClassSummaryDto
+        {
+            public int Id { get; set; }
+            public string Topic { get; set; }
+        }
+
     }
 }
