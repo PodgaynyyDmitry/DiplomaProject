@@ -1,4 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using ServerApp.Data;
 using ServerApp.Models;
 using System;
@@ -55,6 +57,81 @@ namespace ServerApp.Controllers
             return Ok(academicHours);
         }
 
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeletePlatoonSchedule(int id)
+        {
+            var commandText = "SELECT COUNT(*) FROM \"PlatoonSchedule\" WHERE \"PK_PlatoonSchedule\" = @id";
+            var parameter = new NpgsqlParameter("@id", NpgsqlTypes.NpgsqlDbType.Integer) { Value = id };
+
+            using (var command = _context.Database.GetDbConnection().CreateCommand())
+            {
+                command.CommandText = commandText;
+                command.Parameters.Add(parameter);
+                _context.Database.OpenConnection();
+
+                var result = await command.ExecuteScalarAsync();
+                _context.Database.CloseConnection();
+
+                if (Convert.ToInt32(result) == 0)
+                {
+                    return NotFound();
+                }
+            }
+
+            await _context.DeletePlatoonScheduleAsync(id);
+            return NoContent();
+        }
+
+        [HttpDelete("academic-hour/{id}")]
+        public async Task<IActionResult> DeleteAcademicHour(int id)
+        {
+            var commandText = "SELECT COUNT(*) FROM \"AcademicHour\" WHERE \"PK_AcademicHour\" = @id";
+            var parameter = new NpgsqlParameter("@id", NpgsqlTypes.NpgsqlDbType.Integer) { Value = id };
+
+            using (var command = _context.Database.GetDbConnection().CreateCommand())
+            {
+                command.CommandText = commandText;
+                command.Parameters.Add(parameter);
+                _context.Database.OpenConnection();
+
+                var result = await command.ExecuteScalarAsync();
+                _context.Database.CloseConnection();
+
+                if (Convert.ToInt32(result) == 0)
+                {
+                    return NotFound();
+                }
+            }
+
+            await _context.DeleteAcademicHourAsync(id);
+            return NoContent();
+        }
+
+
+        [HttpPut("academic-hour/{id}")]
+        public async Task<ActionResult> UpdateAcademicHour(int id, [FromBody] AcademicHourDto academicHourDto)
+        {
+            // Проверка существования записи
+            var exists = await _context.CheckIfAcademicHourExistsAsync(id);
+            if (!exists)
+            {
+                return NotFound();
+            }
+
+            // Обновление записи
+            await _context.UpdateAcademicHourAsync(
+                id,
+                academicHourDto.PlatoonScheduleId,
+                academicHourDto.PlatoonsId,
+                academicHourDto.SequenceNumber,
+                academicHourDto.NumberOfHours,
+                academicHourDto.DisciplineCode,
+                academicHourDto.Topic,
+                academicHourDto.ClassTypeId
+            );
+
+            return NoContent();
+        }
     }
 
     public class PlatoonScheduleDto
@@ -62,6 +139,7 @@ namespace ServerApp.Controllers
         public int PlatoonsId { get; set; }
         public DateTime WeekStartDate { get; set; }
         public DateTime WeekEndDate { get; set; }
+       // public List<AcademicHourDto> AcademicHours { get; set; }
     }
 
     public class AcademicHourDto

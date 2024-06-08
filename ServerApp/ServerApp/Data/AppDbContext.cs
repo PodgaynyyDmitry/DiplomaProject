@@ -616,6 +616,88 @@ namespace ServerApp.Data
 
             return academicHours;
         }
+
+        public async Task DeletePlatoonScheduleAsync(int id)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT delete_platoon_schedule(@PlatoonScheduleId)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@PlatoonScheduleId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = id });
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
+
+        public async Task DeleteAcademicHourAsync(int academicHourId)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT delete_academic_hour(@AcademicHourId)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@AcademicHourId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = academicHourId });
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
+
+        public async Task UpdateAcademicHourAsync(int academicHourId, int platoonScheduleId, int platoonsId, int sequenceNumber, int numberOfHours, string disciplineCode, string topic, int classTypeId)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT update_academic_hour(@AcademicHourId, @PlatoonScheduleId, @PlatoonsId, @SequenceNumber, @NumberOfHours, @DisciplineCode, @Topic, @ClassTypeId)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@AcademicHourId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = academicHourId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@PlatoonScheduleId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = platoonScheduleId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@PlatoonsId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = platoonsId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@SequenceNumber", NpgsqlTypes.NpgsqlDbType.Integer) { Value = sequenceNumber });
+                    cmd.Parameters.Add(new NpgsqlParameter("@NumberOfHours", NpgsqlTypes.NpgsqlDbType.Integer) { Value = numberOfHours });
+                    cmd.Parameters.Add(new NpgsqlParameter("@DisciplineCode", NpgsqlTypes.NpgsqlDbType.Varchar) { Value = (object)disciplineCode ?? DBNull.Value });
+                    cmd.Parameters.Add(new NpgsqlParameter("@Topic", NpgsqlTypes.NpgsqlDbType.Varchar) { Value = (object)topic ?? DBNull.Value });
+                    cmd.Parameters.Add(new NpgsqlParameter("@ClassTypeId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = classTypeId });
+
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
+
+        public async Task<bool> CheckIfAcademicHourExistsAsync(int academicHourId)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT 1 FROM \"AcademicHour\" WHERE \"PK_AcademicHour\" = @AcademicHourId", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@AcademicHourId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = academicHourId });
+                    var result = await cmd.ExecuteScalarAsync();
+                    return result != null;
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
+
     }
 }
 
