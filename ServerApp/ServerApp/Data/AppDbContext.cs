@@ -975,7 +975,149 @@ namespace ServerApp.Data
             }
         }
 
+        public async Task<int> CreatePlatoonAsync(string name, bool status, int visitDayId, int departmentId)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT create_platoon(@Name, @Status, @VisitDayId, @DepartmentId)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@Name", NpgsqlTypes.NpgsqlDbType.Varchar) { Value = name });
+                    cmd.Parameters.Add(new NpgsqlParameter("@Status", NpgsqlTypes.NpgsqlDbType.Boolean) { Value = status });
+                    cmd.Parameters.Add(new NpgsqlParameter("@VisitDayId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = visitDayId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@DepartmentId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = departmentId });
 
+                    var result = await cmd.ExecuteScalarAsync();
+                    return (int)result;
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
+
+        public async Task<int> CreateStudentAsync(int userId, int platoonsId, int sequenceNumber)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT create_student(@UserId, @PlatoonsId, @SequenceNumber)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@UserId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = userId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@PlatoonsId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = platoonsId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@SequenceNumber", NpgsqlTypes.NpgsqlDbType.Integer) { Value = sequenceNumber });
+
+                    var result = await cmd.ExecuteScalarAsync();
+                    return (int)result;
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
+
+        public async Task<List<StudentDto>> GetStudentsByPlatoonAsync(int platoonId)
+        {
+            var students = new List<StudentDto>();
+
+            using (var command = this.Database.GetDbConnection().CreateCommand())
+            {
+                command.CommandText = "SELECT * FROM get_students_by_platoon(@PlatoonId)";
+                command.Parameters.Add(new NpgsqlParameter("@PlatoonId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = platoonId });
+
+                this.Database.OpenConnection();
+                using (var result = await command.ExecuteReaderAsync())
+                {
+                    while (await result.ReadAsync())
+                    {
+                        students.Add(new StudentDto
+                        {
+                            StudentId = result.GetInt32(0),
+                            UserId = result.GetInt32(1),
+                            SessionStatus = result.GetBoolean(2),
+                            RoleId = result.GetInt32(3),
+                            SequenceNumber = result.GetInt32(4)
+                        });
+                    }
+                }
+            }
+
+            return students;
+        }
+
+        public async Task<List<PlatoonSummaryDto>> GetAllPlatoonsAsync()
+        {
+            var platoons = new List<PlatoonSummaryDto>();
+
+            using (var command = this.Database.GetDbConnection().CreateCommand())
+            {
+                command.CommandText = "SELECT * FROM get_all_platoons()";
+
+                this.Database.OpenConnection();
+                using (var result = await command.ExecuteReaderAsync())
+                {
+                    while (await result.ReadAsync())
+                    {
+                        platoons.Add(new PlatoonSummaryDto
+                        {
+                            PlatoonId = result.GetInt32(0),
+                            Name = result.GetString(1)
+                        });
+                    }
+                }
+            }
+
+            return platoons;
+        }
+
+        public async Task DeleteStudentAndUserAsync(int studentId)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                // Найти идентификатор пользователя по идентификатору студента
+                int userId;
+                using (var cmd = new NpgsqlCommand("SELECT \"PK_User\" FROM \"Student\" WHERE \"PK_Student\" = @StudentId", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@StudentId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = studentId });
+                    userId = (int)await cmd.ExecuteScalarAsync();
+                }
+
+                // Удалить пользователя, что также приведет к каскадному удалению студента
+                using (var cmd = new NpgsqlCommand("SELECT delete_user(@UserId)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@UserId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = userId });
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
+
+        public async Task DeletePlatoonAsync(int platoonId)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT delete_platoon(@PlatoonId)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@PlatoonId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = platoonId });
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
     }
 }
 
