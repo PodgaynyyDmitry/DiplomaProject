@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Builder;
+﻿using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,6 +27,16 @@ namespace ServerApp
             services.AddDbContext<AppDbContext>(options =>
                 options.UseNpgsql(Configuration.GetConnectionString("DefaultConnection")));
 
+            // Настройка аутентификации с использованием куки
+            services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+                .AddCookie(options =>
+                {
+                    options.LoginPath = "/api/auth/login";
+                    options.LogoutPath = "/api/auth/logout";
+                    options.AccessDeniedPath = "/api/auth/accessdenied";
+                    options.ExpireTimeSpan = TimeSpan.FromMinutes(30); // Время жизни куки
+                });
+
             // Добавление Swagger для документирования API
             services.AddSwaggerGen(c =>
             {
@@ -50,10 +61,14 @@ namespace ServerApp
 
             app.UseRouting();
 
+            app.UseAuthentication(); // Включаем аутентификацию
+            app.UseAuthorization();  // Включаем авторизацию
+
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers();
             });
         }
+
     }
 }

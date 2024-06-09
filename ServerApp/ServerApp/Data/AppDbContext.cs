@@ -25,7 +25,7 @@ namespace ServerApp.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<InformationUnit>().HasKey(iu => iu.PK_InformationUnit);
-            modelBuilder.Entity<ContentItem>().HasKey(ci => ci.PK_ContentItem);
+            modelBuilder.Entity<ContentItem>().HasKey(ci => ci.Id);
             modelBuilder.Entity<Models.File>().HasKey(f => f.PK_File);
         }
 
@@ -1117,6 +1117,38 @@ namespace ServerApp.Data
             {
                 await conn.CloseAsync();
             }
+        }
+
+        public async Task<User> ValidateUserAsync(string login, string password)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT * FROM validate_user(@Login, @Password)", conn))
+                {
+                    cmd.Parameters.AddWithValue("Login", login);
+                    cmd.Parameters.AddWithValue("Password", password);
+
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            return new User
+                            {
+                                PK_Users = reader.GetInt32(reader.GetOrdinal("PK_User")),
+                                PK_Role = reader.GetInt32(reader.GetOrdinal("PK_Role")),
+                                SessionStatus = reader.GetBoolean(reader.GetOrdinal("SessionStatus"))
+                            };
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+            return null;
         }
     }
 }
