@@ -77,6 +77,7 @@ namespace ServerApp.Data
                 "SELECT create_file(@InformationUnitId, @Path, @SequenceNumber, @FileName)",
                 informationUnitIdParam, pathParam, sequenceNumberParam, fileNameParam);
         }
+       
         public async Task<InformationUnitDto> GetInformationUnitAsync(int id)
         {
             var conn = (NpgsqlConnection)this.Database.GetDbConnection();
@@ -175,6 +176,7 @@ namespace ServerApp.Data
             var idParam = new NpgsqlParameter("@id", NpgsqlTypes.NpgsqlDbType.Integer) { Value = id };
             await this.Database.ExecuteSqlRawAsync("SELECT delete_information_unit(@id)", idParam);
         }
+       
         public async Task<List<InformationUnitSummaryDto>> GetAllInformationUnitsAsync()
         {
             var informationUnits = new List<InformationUnitSummaryDto>();
@@ -786,24 +788,6 @@ namespace ServerApp.Data
             return null;
         }
 
-        //public async Task<bool> CheckIfTeacherExistsAsync(int teacherId)
-        //{
-        //    var conn = (NpgsqlConnection)this.Database.GetDbConnection();
-        //    await conn.OpenAsync();
-        //    try
-        //    {
-        //        using (var cmd = new NpgsqlCommand("SELECT check_if_teacher_exists(@TeacherId)", conn))
-        //        {
-        //            cmd.Parameters.Add(new NpgsqlParameter("@TeacherId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = teacherId });
-        //            var result = await cmd.ExecuteScalarAsync();
-        //            return (bool)result;
-        //        }
-        //    }
-        //    finally
-        //    {
-        //        await conn.CloseAsync();
-        //    }
-        //}
         public async Task<int?> GetUserIdByTeacherIdAsync(int teacherId)
         {
             var conn = (NpgsqlConnection)this.Database.GetDbConnection();
@@ -886,6 +870,112 @@ namespace ServerApp.Data
                 await conn.CloseAsync();
             }
         }
+
+        public async Task CreateCurrentRightsAsync(List<CreateCurrentRightsRequestDto> rights)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                foreach (var right in rights)
+                {
+                    using (var cmd = new NpgsqlCommand("SELECT create_current_rights(@UserId, @RightsId, @Writing, @Reading)", conn))
+                    {
+                        cmd.Parameters.Add(new NpgsqlParameter("@UserId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = right.UserId });
+                        cmd.Parameters.Add(new NpgsqlParameter("@RightsId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = right.RightsId });
+                        cmd.Parameters.Add(new NpgsqlParameter("@Writing", NpgsqlTypes.NpgsqlDbType.Boolean) { Value = right.Writing });
+                        cmd.Parameters.Add(new NpgsqlParameter("@Reading", NpgsqlTypes.NpgsqlDbType.Boolean) { Value = right.Reading });
+
+                        await cmd.ExecuteNonQueryAsync();
+                    }
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
+
+        public async Task<List<CurrentRightsDto>> GetCurrentRightsAsync(int userId)
+        {
+            var rights = new List<CurrentRightsDto>();
+
+            using (var command = this.Database.GetDbConnection().CreateCommand())
+            {
+                command.CommandText = "SELECT * FROM get_current_rights(@UserId)";
+                command.Parameters.Add(new NpgsqlParameter("@UserId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = userId });
+
+                this.Database.OpenConnection();
+                using (var result = await command.ExecuteReaderAsync())
+                {
+                    while (await result.ReadAsync())
+                    {
+                        rights.Add(new CurrentRightsDto
+                        {
+                            UserId = result.GetInt32(0),
+                            RoleName = result.GetString(1),
+                            RightsName = result.GetString(2),
+                            Writing = result.GetBoolean(3),
+                            Reading = result.GetBoolean(4)
+                        });
+                    }
+                }
+            }
+
+            return rights;
+        }
+
+        public async Task UpdateUserRightAsync(int userId, RightDto right)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var checkCmd = new NpgsqlCommand("SELECT 1 FROM \"CurrentRights\" WHERE \"PK_User\" = @UserId AND \"PK_Rights\" = @RightId", conn))
+                {
+                    checkCmd.Parameters.Add(new NpgsqlParameter("@UserId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = userId });
+                    checkCmd.Parameters.Add(new NpgsqlParameter("@RightId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = right.RightId });
+
+                    var exists = await checkCmd.ExecuteScalarAsync() != null;
+
+                    if (exists)
+                    {
+                        using (var updateCmd = new NpgsqlCommand(@"
+                    UPDATE ""CurrentRights""
+                    SET ""Writing"" = @Writing, ""Reading"" = @Reading
+                    WHERE ""PK_User"" = @UserId AND ""PK_Rights"" = @RightId", conn))
+                        {
+                            updateCmd.Parameters.Add(new NpgsqlParameter("@UserId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = userId });
+                            updateCmd.Parameters.Add(new NpgsqlParameter("@RightId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = right.RightId });
+                            updateCmd.Parameters.Add(new NpgsqlParameter("@Writing", NpgsqlTypes.NpgsqlDbType.Boolean) { Value = right.Writing });
+                            updateCmd.Parameters.Add(new NpgsqlParameter("@Reading", NpgsqlTypes.NpgsqlDbType.Boolean) { Value = right.Reading });
+
+                            await updateCmd.ExecuteNonQueryAsync();
+                        }
+                    }
+                    else
+                    {
+                        using (var insertCmd = new NpgsqlCommand(@"
+                    INSERT INTO ""CurrentRights"" (""PK_User"", ""PK_Rights"", ""Writing"", ""Reading"")
+                    VALUES (@UserId, @RightId, @Writing, @Reading)", conn))
+                        {
+                            insertCmd.Parameters.Add(new NpgsqlParameter("@UserId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = userId });
+                            insertCmd.Parameters.Add(new NpgsqlParameter("@RightId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = right.RightId });
+                            insertCmd.Parameters.Add(new NpgsqlParameter("@Writing", NpgsqlTypes.NpgsqlDbType.Boolean) { Value = right.Writing });
+                            insertCmd.Parameters.Add(new NpgsqlParameter("@Reading", NpgsqlTypes.NpgsqlDbType.Boolean) { Value = right.Reading });
+
+                            await insertCmd.ExecuteNonQueryAsync();
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
+
+
     }
 }
 
