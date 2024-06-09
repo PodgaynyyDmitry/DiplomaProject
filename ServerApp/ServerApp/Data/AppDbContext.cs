@@ -786,6 +786,106 @@ namespace ServerApp.Data
             return null;
         }
 
+        //public async Task<bool> CheckIfTeacherExistsAsync(int teacherId)
+        //{
+        //    var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+        //    await conn.OpenAsync();
+        //    try
+        //    {
+        //        using (var cmd = new NpgsqlCommand("SELECT check_if_teacher_exists(@TeacherId)", conn))
+        //        {
+        //            cmd.Parameters.Add(new NpgsqlParameter("@TeacherId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = teacherId });
+        //            var result = await cmd.ExecuteScalarAsync();
+        //            return (bool)result;
+        //        }
+        //    }
+        //    finally
+        //    {
+        //        await conn.CloseAsync();
+        //    }
+        //}
+        public async Task<int?> GetUserIdByTeacherIdAsync(int teacherId)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT \"PK_User\" FROM \"Teacher\" WHERE \"PK_Teacher\" = @TeacherId", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@TeacherId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = teacherId });
+                    var result = await cmd.ExecuteScalarAsync();
+                    return result != null ? (int?)result : null;
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
+
+        public async Task<bool> CheckIfTeacherExistsAsync(int teacherId)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT EXISTS (SELECT 1 FROM \"Teacher\" WHERE \"PK_Teacher\" = @TeacherId)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@TeacherId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = teacherId });
+                    var result = await cmd.ExecuteScalarAsync();
+                    return (bool)result;
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
+
+        public async Task DeleteUserAsync(int userId)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("DELETE FROM \"Users\" WHERE \"PK_User\" = @UserId", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@UserId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = userId });
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
+
+        public async Task UpdateTeacherAsync(int teacherId, string name, int number, int postId, string merits, int rankId, int departmentId, bool visibility, string photo)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT update_teacher(@TeacherId, @Name, @Number, @PostId, @Merits, @RankId, @DepartmentId, @Visibility, @Photo)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@TeacherId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = teacherId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@Name", NpgsqlTypes.NpgsqlDbType.Varchar) { Value = name });
+                    cmd.Parameters.Add(new NpgsqlParameter("@Number", NpgsqlTypes.NpgsqlDbType.Integer) { Value = number });
+                    cmd.Parameters.Add(new NpgsqlParameter("@PostId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = postId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@Merits", NpgsqlTypes.NpgsqlDbType.Text) { Value = (object)merits ?? DBNull.Value });
+                    cmd.Parameters.Add(new NpgsqlParameter("@RankId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = rankId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@DepartmentId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = departmentId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@Visibility", NpgsqlTypes.NpgsqlDbType.Boolean) { Value = visibility });
+                    cmd.Parameters.Add(new NpgsqlParameter("@Photo", NpgsqlTypes.NpgsqlDbType.Varchar) { Value = photo });
+
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
     }
 }
 

@@ -20,7 +20,7 @@ namespace ServerApp.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult> CreateTeacher([FromBody] CreateTeacherRequestDto request)
+        public async Task<ActionResult> CreateTeacher(CreateTeacherRequestDto request)
         {
             // Создание пользователя
             int userId = await _context.CreateUserAsync(
@@ -34,18 +34,20 @@ namespace ServerApp.Controllers
                 return BadRequest("User creation failed.");
             }
 
-            // Сохранение фото на сервере
+            // Сохранение фото
             string photoFileName = null;
-            if (!string.IsNullOrEmpty(request.Photo))
+            if (!string.IsNullOrEmpty(request.Photo) && IsValidBase64(request.Photo))
             {
                 var (fileData, extension) = ExtractFileDataAndExtension(request.Photo);
-                photoFileName = $"{Guid.NewGuid()}.{extension}";
-                var photoFilePath = Path.Combine("uploads", photoFileName);
-                Directory.CreateDirectory(Path.GetDirectoryName(photoFilePath));
-                await System.IO.File.WriteAllBytesAsync(photoFilePath, fileData);
+                photoFileName = $"teacher_photo_{userId}_{Guid.NewGuid()}.{extension}";
+                string uploadsFolder = Path.Combine("Uploads", "teacher_photos");
+                string filePath = Path.Combine(uploadsFolder, photoFileName);
+                Directory.CreateDirectory(Path.GetDirectoryName(filePath));
+                await System.IO.File.WriteAllBytesAsync(filePath, fileData);
+                photoFileName = $"{Request.Scheme}://{Request.Host}/uploads/teacher_photos/{photoFileName}";
             }
 
-            // Создание учителя
+            // Создание преподавателя
             int teacherId = await _context.CreateTeacherAsync(
                 userId,
                 request.Name,
@@ -62,8 +64,32 @@ namespace ServerApp.Controllers
                 return BadRequest("Teacher creation failed.");
             }
 
-            return Ok(new { userId, teacherId });
+            return CreatedAtAction(nameof(CreateTeacher), new { id = teacherId }, request);
         }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteTeacher(int id)
+        {
+            // Проверка существования преподавателя
+            var exists = await _context.CheckIfTeacherExistsAsync(id);
+            if (!exists)
+            {
+                return NotFound();
+            }
+
+            // Получение идентификатора пользователя
+            var userId = await _context.GetUserIdByTeacherIdAsync(id);
+            if (userId == null)
+            {
+                return NotFound("User for the teacher not found.");
+            }
+
+            // Удаление пользователя (что приведет к каскадному удалению учителя)
+            await _context.DeleteUserAsync(userId.Value);
+
+            return NoContent();
+        }
+
         [HttpGet("{id}")]
         public async Task<ActionResult<TeacherDto>> GetTeacher(int id)
         {
@@ -75,6 +101,50 @@ namespace ServerApp.Controllers
             return Ok(teacher);
         }
 
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateTeacher(int id, [FromBody] UpdateTeacherRequestDto request)
+        {
+            var exists = await _context.CheckIfTeacherExistsAsync(id);
+            if (!exists)
+            {
+                return NotFound();
+            }
+
+            string photoPath = null;
+            if (!string.IsNullOrEmpty(request.PhotoData) && IsValidBase64(request.PhotoData))
+            {
+                var (fileData, extension) = ExtractFileDataAndExtension(request.PhotoData);
+                var fileName = $"teacher_photo_{id}_{Guid.NewGuid()}.{extension}";
+                photoPath = Path.Combine("Uploads", fileName);
+                Directory.CreateDirectory(Path.GetDirectoryName(photoPath));
+                await System.IO.File.WriteAllBytesAsync(photoPath, fileData);
+                photoPath = Path.Combine($"{Request.Scheme}://{Request.Host}/uploads/", fileName);
+            }
+
+            await _context.UpdateTeacherAsync(
+                id,
+                request.Name,
+                request.Number,
+                request.PostId,
+                request.Merits,
+                request.RankId,
+                request.DepartmentId,
+                request.Visibility,
+                photoPath
+            );
+
+            return NoContent();
+        }
+
+        private bool IsValidBase64(string base64String)
+        {
+            if (string.IsNullOrEmpty(base64String))
+                return false;
+
+            base64String = base64String.Split(',')[1]; // Удаление префикса "data:image/png;base64,"
+            Span<byte> buffer = new Span<byte>(new byte[base64String.Length]);
+            return Convert.TryFromBase64String(base64String, buffer, out _);
+        }
 
         private (byte[] fileData, string extension) ExtractFileDataAndExtension(string base64String)
         {
@@ -97,6 +167,17 @@ public class UserDto
     public int RoleId { get; set; }
 }
 
+public class UpdateTeacherRequestDto
+{
+    public string Name { get; set; }
+    public int Number { get; set; }
+    public int PostId { get; set; }
+    public string Merits { get; set; }
+    public int RankId { get; set; }
+    public int DepartmentId { get; set; }
+    public bool Visibility { get; set; }
+    public string PhotoData { get; set; } // Base64 string for photo
+}
 public class TeacherDto
 {
     public int TeacherId { get; set; }
