@@ -698,6 +698,94 @@ namespace ServerApp.Data
             }
         }
 
+        public async Task<int> CreateUserAsync(string login, string password, bool sessionStatus, int roleId)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT create_user(@Login, @Password, @SessionStatus, @RoleId)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@Login", NpgsqlTypes.NpgsqlDbType.Varchar) { Value = login });
+                    cmd.Parameters.Add(new NpgsqlParameter("@Password", NpgsqlTypes.NpgsqlDbType.Varchar) { Value = password });
+                    cmd.Parameters.Add(new NpgsqlParameter("@SessionStatus", NpgsqlTypes.NpgsqlDbType.Boolean) { Value = sessionStatus });
+                    cmd.Parameters.Add(new NpgsqlParameter("@RoleId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = roleId });
+
+                    var result = await cmd.ExecuteScalarAsync();
+                    return (int)result;
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
+
+        public async Task<int> CreateTeacherAsync(int userId, string name, int number, int postId, string merits, int rankId, int departmentId, bool visibility, string photoFileName)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT create_teacher(@UserId, @Name, @Number, @PostId, @Merits, @RankId, @DepartmentId, @Visibility, @PhotoFileName)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@UserId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = userId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@Name", NpgsqlTypes.NpgsqlDbType.Varchar) { Value = name });
+                    cmd.Parameters.Add(new NpgsqlParameter("@Number", NpgsqlTypes.NpgsqlDbType.Integer) { Value = number });
+                    cmd.Parameters.Add(new NpgsqlParameter("@PostId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = postId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@Merits", NpgsqlTypes.NpgsqlDbType.Text) { Value = (object)merits ?? DBNull.Value });
+                    cmd.Parameters.Add(new NpgsqlParameter("@RankId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = rankId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@DepartmentId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = departmentId });
+                    cmd.Parameters.Add(new NpgsqlParameter("@Visibility", NpgsqlTypes.NpgsqlDbType.Boolean) { Value = visibility });
+                    cmd.Parameters.Add(new NpgsqlParameter("@PhotoFileName", NpgsqlTypes.NpgsqlDbType.Varchar) { Value = (object)photoFileName ?? DBNull.Value });
+
+                    var result = await cmd.ExecuteScalarAsync();
+                    return (int)result;
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+        }
+
+        public async Task<TeacherDto> GetTeacherAsync(int teacherId)
+        {
+            var conn = (NpgsqlConnection)this.Database.GetDbConnection();
+            await conn.OpenAsync();
+            try
+            {
+                using (var cmd = new NpgsqlCommand("SELECT * FROM get_teacher(@TeacherId)", conn))
+                {
+                    cmd.Parameters.Add(new NpgsqlParameter("@TeacherId", NpgsqlTypes.NpgsqlDbType.Integer) { Value = teacherId });
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            return new TeacherDto
+                            {
+                                TeacherId = reader.GetInt32(0),
+                                UserId = reader.GetInt32(1),
+                                Name = reader.GetString(2),
+                                Number = reader.GetInt32(3),
+                                Post = reader.GetString(4),
+                                Merits = reader.IsDBNull(5) ? null : reader.GetString(5),
+                                Rank = reader.GetString(6),
+                                Department = reader.GetString(7),
+                                Visibility = reader.GetBoolean(8),
+                                Photo = reader.IsDBNull(9) ? null : reader.GetString(9)
+                            };
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                await conn.CloseAsync();
+            }
+            return null;
+        }
+
     }
 }
 
